@@ -1,9 +1,6 @@
 import pandas as pd
 
-def reconcile_data(transactions_file, settlements_file):
-    # Load data
-    txn = pd.read_csv(transactions_file)
-    settle = pd.read_csv(settlements_file)
+def reconcile_data(txn, settle):   # ✅ accept DataFrames
 
     # Clean column names
     txn.columns = txn.columns.str.strip().str.lower()
@@ -11,7 +8,7 @@ def reconcile_data(transactions_file, settlements_file):
 
     issues = []
 
-    # Merge on correct column
+    # Merge
     merged = txn.merge(
         settle,
         on="transaction_id",
@@ -20,7 +17,7 @@ def reconcile_data(transactions_file, settlements_file):
         indicator=True
     )
 
-    # 🔍 1. Missing settlement (T+1/T+2 allowed but still unmatched)
+    # 🔍 1. Missing / Unexpected
     for _, row in merged.iterrows():
         if row["_merge"] == "left_only":
             issues.append({
@@ -50,8 +47,7 @@ def reconcile_data(transactions_file, settlements_file):
             "issue": "Duplicate Settlement"
         })
 
-    # 🔍 4. Refund without original
-   # 🔍 Refund detection (safe)
+    # 🔍 4. Refund without original (safe)
     if "type" in txn.columns:
         txn["type"] = txn["type"].astype(str)
 
@@ -65,13 +61,11 @@ def reconcile_data(transactions_file, settlements_file):
                     "transaction_id": row["transaction_id"],
                     "issue": "Refund Without Original"
                 })
-    else:
-        print("⚠️ Refund column not present — skipped")
 
-    # 🔍 5. Rounding difference (aggregate)
+    # 🔍 5. Net difference (not just rounding)
     txn_total = txn["amount"].sum()
     settle_total = settle["amount"].sum()
-    rounding_diff = round(txn_total - settle_total, 2)
+    net_diff = round(txn_total - settle_total, 2)
 
     issues_df = pd.DataFrame(issues)
 
@@ -79,7 +73,7 @@ def reconcile_data(transactions_file, settlements_file):
         "Total Transactions": len(txn),
         "Total Settlements": len(settle),
         "Total Issues": len(issues_df),
-        "Rounding Difference": rounding_diff
+        "Rounding Difference": net_diff   # keep name if needed
     }
 
     return issues_df, summary

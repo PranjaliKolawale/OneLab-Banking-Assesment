@@ -13,7 +13,26 @@ txn_file = st.file_uploader("Upload Transactions CSV", type=["csv"])
 settle_file = st.file_uploader("Upload Settlements CSV", type=["csv"])
 
 if txn_file and settle_file:
-    issues_df, summary = reconcile_data(txn_file, settle_file)
+
+    # ✅ Read files once (for checking only)
+    txn_df = pd.read_csv(txn_file)
+    settle_df = pd.read_csv(settle_file)
+
+    # Normalize column names
+    txn_cols = txn_df.columns.str.lower().str.strip()
+    settle_cols = settle_df.columns.str.lower().str.strip()
+
+    # ✅ Swap detection logic
+    if "settlement_id" in txn_cols:
+        st.error("❌ You uploaded a Settlements file in the Transactions section")
+        st.stop()
+
+    if "settlement_id" not in settle_cols:
+        st.error("❌ You uploaded a Transactions file in the Settlements section")
+        st.stop()
+
+    # ✅ Run original logic (no change)
+    issues_df, summary = reconcile_data(txn_df, settle_df)
 
     st.subheader("📊 Summary")
     col1, col2, col3, col4 = st.columns(4)
